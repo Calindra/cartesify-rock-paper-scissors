@@ -1,16 +1,8 @@
 import {useState} from "react";
 import { useToast, Heading, Select, Button } from "@chakra-ui/react";
 import { generateCommitment } from "./util";
-import { Cartesify } from "@calindra/cartesify";
 import { MOVE_KEY, NONCE_KEY } from "./constants";
-
-const fetch = Cartesify.createFetch({
-    dappAddress: '0x70ac08179605AF2D9e75782b8DEcDD3c22aA4D0C',
-    endpoints: {
-      graphQL: new URL("http://localhost:8080/graphql"),
-      inspect: new URL("http://localhost:8080/inspect"),
-    },
-  })
+import { submitTransaction } from "./CartesiTransaction";
 
 function Challenges({challenges, address, signer, showAccept=false}) {
     const toast = useToast()
@@ -48,6 +40,17 @@ function Challenges({challenges, address, signer, showAccept=false}) {
         
     }
 
+    const sendRevealMoveTransaction = async (nonce, move) => {
+
+        let payload:any = {
+            "method": "reveal",
+            "nonce": nonce,
+            "move": move
+        }
+
+        return submitTransaction(payload, signer)
+    }
+
     const revealMove = async () => {
         const nonce = localStorage.getItem(NONCE_KEY + address)
         const move = localStorage.getItem(MOVE_KEY + address)
@@ -63,18 +66,13 @@ function Challenges({challenges, address, signer, showAccept=false}) {
 
         setRevealLoading(true);
 
-        const response = await fetch("http://127.0.0.1:8383/revealMove", {
-            method: "POST",
-            headers: {
-                    "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ nonce, move }),
-            signer 
-        })
+        
+        const response = await sendRevealMoveTransaction(nonce, move)
+
 
         setRevealLoading(false);
 
-        if(response.ok) {
+        if(response.id) {
             toast({
                 title: "Confirmed",
                 description: `Move Revealed successfully`,
@@ -96,9 +94,21 @@ function Challenges({challenges, address, signer, showAccept=false}) {
 
     }
 
-    const acceptChallenge = async (id) => {
+ 
+    const sendAcceptTransaction = async (id) => {
         const commitment = await generateCommitment(choice, signer)
 
+        let payload:any = {
+            "method": "accept_challenge",
+            "commitment": commitment,
+            "challengeId": id
+        }
+
+        return submitTransaction(payload, signer)
+    }
+
+    const acceptChallenge = async (id) => {
+      
         toast({
             title: "Transaction sent",
             description: "waiting for confirmation",
@@ -110,18 +120,11 @@ function Challenges({challenges, address, signer, showAccept=false}) {
 
         setAcceptLoading(true);
 
-        const response = await fetch("http://127.0.0.1:8383/acceptChallenge", {
-            method: "POST",
-            headers: {
-                    "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ commitment, challengeId: id }),
-            signer 
-        })
+        const response = await sendAcceptTransaction(id)
 
         setAcceptLoading(false);
 
-        if(response.ok) {
+        if(response.id) {
             toast({
                 title: "Confirmed",
                 description: `Challenge accepted successfully`,

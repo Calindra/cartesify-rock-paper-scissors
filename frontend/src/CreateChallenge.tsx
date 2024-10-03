@@ -1,24 +1,29 @@
-import React, {useState} from "react";
+import {useState} from "react";
 import {Button, useToast, Select, Heading} from '@chakra-ui/react'
 import { generateCommitment } from "./util"
-import { Cartesify } from "@calindra/cartesify";
+import { submitTransaction } from "./CartesiTransaction";
 
-const fetch = Cartesify.createFetch({
-    dappAddress: '0x70ac08179605AF2D9e75782b8DEcDD3c22aA4D0C',
-    endpoints: {
-      graphQL: new URL("http://localhost:8080/graphql"),
-      inspect: new URL("http://localhost:8080/inspect"),
-    },
-  })
 
 function CreateChallenge ({signer}) {
     const [choice, setChoice] = useState<number>(1)
     const [loading, setLoading] = useState(false)
     const toast = useToast()
 
-    async function createChallenge() {
+    async function sendTransaction(): Promise<any> {
         const commitment = await generateCommitment(choice, signer)
 
+        console.log(`Commitment is ${commitment}`)
+
+        let payload:any = {
+            "method": "create_challenge",
+            "commitment": commitment
+        }
+
+        return submitTransaction(payload, signer)
+        
+    }
+
+    async function createChallenge() {
         toast({
             title: "Transaction sent",
             description: "waiting for confirmation",
@@ -28,16 +33,13 @@ function CreateChallenge ({signer}) {
             position: "top-left"
         })
 
-        const response = await fetch("http://127.0.0.1:8383/createChallenge", {
-            method: "POST",
-            headers: {
-                    "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ commitment }),
-            signer 
-        })
+        console.log("Sending transaction")
 
-        if(response.ok) {
+        const response = await sendTransaction()
+
+        console.log(response)
+
+        if(response.id) {
             toast({
                 title: "Confirmed",
                 description: `Challenge created successfully`,
@@ -57,8 +59,7 @@ function CreateChallenge ({signer}) {
             })
         }
 
-        let results = await response.json();
-        console.log(results) // will print the backend response as json
+        console.log(response.data) // will print the backend response as json
         
 
     }

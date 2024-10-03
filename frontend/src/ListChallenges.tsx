@@ -2,14 +2,7 @@ import React, {useState, useEffect} from "react";
 import { Button, Heading } from "@chakra-ui/react";
 import Challenges from "./Challenges";
 import { Cartesify } from "@calindra/cartesify";
-
-const fetch = Cartesify.createFetch({
-    dappAddress: '0x70ac08179605AF2D9e75782b8DEcDD3c22aA4D0C',
-    endpoints: {
-      graphQL: new URL("http://localhost:8080/graphql"),
-      inspect: new URL("http://localhost:8080/inspect"),
-    },
-  })
+import { ethers } from "ethers";
 
 function ListChallenges({signer}) {
     const [currentChallenges, setCurrentChallenges] = useState<any[]>([])
@@ -36,28 +29,35 @@ function ListChallenges({signer}) {
         let results;
     //    results = await inspect({"method": "get_challenges"})
     //     results = JSON.parse(hex2str(results[0].payload))["challenges"]
+        let payload:any = {
+            "method": "get_challenges",
+        }
 
+    const payloadJSON = JSON.stringify(payload)
 
-        const response = await fetch("http://127.0.0.1:8383/challenges", {
-            method: "GET",
-            headers: {
-                    "Content-Type": "application/json",
-            },
-            signer 
-        })
+        const response = await fetch(`http://localhost:8080/inspect/${payloadJSON}`)
 
         console.log(response.ok)
         results = await response.json();
-        console.log(results) // will print the backend response as json
+        console.log(results) // will print the backend response as json     
         
-
         const currentChallenges: any[] = []
         let myChallenge = undefined
         const oldChallenges: any[] = []
         const myOldChallenges:any[] = []
 
-        if(results?.challenges?.length > 0) {
-            for (const challenge of results.challenges) {
+        let challenges = []
+
+        if(results.reports) {
+            const report = ethers.toUtf8String(results.reports[0].payload)
+
+            challenges = JSON.parse(report)['challenges']
+        }
+
+        console.log("challenges", challenges)
+
+        if(challenges?.length > 0) {
+            for (const challenge of challenges) {
                 const userParticipated = challenge.opponent === address || challenge.creator === address
     
                 if(challenge.winner && userParticipated) {
