@@ -1,10 +1,9 @@
 import { PAIO_NONCE_URL, PAIO_TRANSACTION_URL } from "./constants";
-import { AbiCoder, ethers } from "ethers";
+import { ethers } from "ethers";
 
 const app = "0xab7528bb862fb57e8a2bcd567a2e929a0be56a5e";
 
 let typedData = {
-    account: "0x" as any,
     domain: {
         name: "Cartesi",
         version: "0.1.0",
@@ -13,7 +12,12 @@ let typedData = {
             "0x0000000000000000000000000000000000000000",
     } as const,
     types: {
-      
+        EIP712Domain: [
+            { name: "name", type: "string" },
+            { name: "version", type: "string" },
+            { name: "chainId", type: "uint256" },
+            { name: "verifyingContract", type: "address" },
+        ],
         CartesiMessage: [
             { name: "app", type: "address" },
             { name: "nonce", type: "uint64" },
@@ -22,7 +26,22 @@ let typedData = {
         ],
     } as const,
     primaryType: "CartesiMessage" as const,
-    message: { nonce: BigInt(0), data: "0x" },
+    message: {
+        app: "0x",
+        nonce: 0,
+        data: "0x",
+        max_gas_price: 10
+    },
+}
+
+let types = {
+ 
+    CartesiMessage: [
+        { name: "app", type: "address" },
+        { name: "nonce", type: "uint64" },
+        { name: "max_gas_price", type: "uint128" },
+        { name: "data", type: "bytes" },
+    ],
 }
 
 export const fetchNonce = async (user: any) => {
@@ -36,13 +55,11 @@ export const fetchNonce = async (user: any) => {
 
     const responseData = await response.json();
     const nextNonce = responseData.nonce;
-    return BigInt(nextNonce)
+    return Number(nextNonce)
 }
 
 export const submitTransaction = async(payload: any, signer: any) => {
     const account = await signer.getAddress();
-
-    typedData.account = account
 
     console.log(`Getting nonce`)
 
@@ -52,61 +69,43 @@ export const submitTransaction = async(payload: any, signer: any) => {
 
     const payloadJSON = JSON.stringify(payload)
     const payloadBytes = ethers.toUtf8Bytes(payloadJSON)
+    const hexPayload =  ethers.hexlify(payloadBytes)
 
     const message = {
         app,
-        nonce: BigInt(nonce),
-        data: payloadBytes,
-        max_gas_price: BigInt(10),
+        nonce: nonce,
+        data: hexPayload,
+        max_gas_price: Number(10),
     };
+
+    console.log(message)
 
     typedData.message = message
 
+    console.log("account", account)
+    console.log(typedData)
+
     const signature = await signer.signTypedData(
-        typedData.domain,
-        typedData.types,
-        typedData.message
+        typedData.domain,  
+        types,   
+        typedData.message 
     );
-
-    console.log("Enconding ABI")
-
-    // Codificar a mensagem para envio
-    const abiEncoder = new AbiCoder();
-    const hexData = abiEncoder.encode(
-        ['address', 'uint64', 'uint128', 'bytes'],
-        [message.app, message.nonce, message.max_gas_price, message.data]
-    );
-
-    // Decodificar para validar
-    const decoded = abiEncoder.decode(
-        ['address', 'uint64', 'uint128', 'bytes'],
-        hexData
-    );
-    console.log(...decoded);
-    console.log({ hexData });
-
-     console.log("Sending to Paio")
 
      // Enviar para Paio
-     return await submitToPaio(signature, hexData);
+     return await submitToPaio({typedData, account, signature});
 }
 
-export const submitToPaio = async(signature: any, message: any) => {
-    const body = JSON.stringify({
-        signature,
-        message,
-    })
-
-    const response = await fetch(PAIO_TRANSACTION_URL, {
-        method: 'POST',
-        body,
-        headers: { 'Content-Type': 'application/json' }
-    });
-
-    if (!response.ok) { 
-        console.log("submit to Paio failed")
-        throw new Error("submit to Paio failed: " + response.text())
-    } else {
-        return response.json()
-    }
+export const submitToPaio = async(fullBody: any) => {
+    const body = JSON.stringify(fullBody)
+        const response = await fetch(PAIO_TRANSACTION_URL, {
+            method: 'POST',
+            body,
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+            console.log("submit to Paio failed")
+            throw new Error("submit to Paio failed: " + response.text())
+        } else {
+            return response.json()
+        }
 }
